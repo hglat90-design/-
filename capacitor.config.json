@@ -1,0 +1,9 @@
+{
+  "appId": "com.almuslim.app",
+  "appName": "المسلم",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

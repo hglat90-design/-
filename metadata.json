@@ -1,0 +1,10 @@
+{
+  "name": "المسلم - Al-Muslim Islamic App",
+  "description": "تطبيق المسلم الشامل - أوقات الصلاة الدقيقة، الأذان التلقائي، القرآن الكريم بالتفسير والترجمة التركية، اتجاه القبلة، الأذكار، والسبحة الإلكترونية بتقنية Jetpack Compose.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
