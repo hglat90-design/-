@@ -5,7 +5,7 @@ import {
   Calculator, 
   Sliders, 
   Check, 
-  Play,
+  Play, 
   Square,
   ShieldCheck,
   BellRing
@@ -14,15 +14,29 @@ import { AppSettings, CalculationMethodId, Language, AdhanVoiceId } from '../typ
 import { getTranslation } from '../translations';
 import { CALCULATION_METHODS } from '../utils/prayerCalculator';
 import { playAdhan, stopAdhan } from '../utils/soundEffects';
+import { RemindersSection } from './RemindersSection';
+import { PeriodicReminderConfig } from '../utils/notificationManager';
 
 interface SettingsScreenProps {
   settings: AppSettings;
   onUpdateSettings: (updater: (prev: AppSettings) => AppSettings) => void;
+  periodicConfig: PeriodicReminderConfig;
+  onUpdatePeriodicConfig: (updater: (prev: PeriodicReminderConfig) => PeriodicReminderConfig) => void;
+  isAutoAdhanEnabled: boolean;
+  onToggleAutoAdhan: (enabled: boolean) => void;
+  customReminders?: import('../types').CustomReminderItem[];
+  onUpdateCustomReminders?: (reminders: import('../types').CustomReminderItem[]) => void;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   settings,
   onUpdateSettings,
+  periodicConfig,
+  onUpdatePeriodicConfig,
+  isAutoAdhanEnabled,
+  onToggleAutoAdhan,
+  customReminders,
+  onUpdateCustomReminders,
 }) => {
   const t = getTranslation(settings.language);
 
@@ -42,7 +56,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Language Section (Primary in-app dynamic language switcher) */}
+      {/* 1. Language Section */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-sm">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
           <Globe className="w-4 h-4 text-emerald-400" />
@@ -76,7 +90,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
       </div>
 
-      {/* Real Authentic Adhan Voices Selector */}
+      {/* 2. Reminders & Auto-Adhan Center (Every 5 mins & prayer times) */}
+      <RemindersSection
+        language={settings.language}
+        periodicConfig={periodicConfig}
+        onUpdatePeriodicConfig={onUpdatePeriodicConfig}
+        isAutoAdhanEnabled={isAutoAdhanEnabled}
+        onToggleAutoAdhan={onToggleAutoAdhan}
+        customReminders={customReminders}
+        onUpdateCustomReminders={onUpdateCustomReminders}
+      />
+
+      {/* 3. Real Authentic Adhan Voices Selector */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-sm">
         <div className="flex items-center justify-between text-xs font-bold text-slate-200">
           <div className="flex items-center gap-2">
@@ -125,7 +150,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
       </div>
 
-      {/* Prayer Calculation Method */}
+      {/* 4. Astronomical Calculation Method */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-sm">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
           <Calculator className="w-4 h-4 text-emerald-400" />
@@ -162,7 +187,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
       </div>
 
-      {/* Asr Juristic Method */}
+      {/* 5. Asr Juristic Method */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-sm">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
           <Sliders className="w-4 h-4 text-emerald-400" />
@@ -190,21 +215,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           >
             {t.hanafi}
           </button>
-        </div>
-      </div>
-
-      {/* Islamic Production Notice Card */}
-      <div className="p-4 rounded-3xl bg-slate-900/40 border border-emerald-900/40 flex items-start gap-3">
-        <div className="p-2.5 rounded-2xl bg-emerald-950 border border-emerald-700/40 text-amber-300 shrink-0">
-          <BellRing className="w-4 h-4 text-amber-400" />
-        </div>
-        <div>
-          <h4 className="font-bold text-xs text-emerald-300 font-cairo">
-            {t.notificationsTitle}
-          </h4>
-          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-            {t.backgroundServiceNotice}
-          </p>
         </div>
       </div>
     </div>

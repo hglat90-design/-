@@ -2,8 +2,9 @@ import { AdhanVoiceId } from '../types';
 
 let audioCtx: AudioContext | null = null;
 let currentAdhanAudio: HTMLAudioElement | null = null;
+let wakeLockSentinel: any = null;
 
-function getAudioContext(): AudioContext {
+export function getAudioContext(): AudioContext {
   if (!audioCtx) {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     audioCtx = new AudioContextClass();
@@ -12,6 +13,20 @@ function getAudioContext(): AudioContext {
     audioCtx.resume();
   }
   return audioCtx;
+}
+
+/**
+ * Pre-unlocks audio context upon any user interaction so background audio can start smoothly
+ */
+export function unlockAudioContext() {
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+  } catch (e) {
+    console.debug('AudioContext unlock notice:', e);
+  }
 }
 
 /**
@@ -41,7 +56,7 @@ export function playTasbeehClick() {
 }
 
 /**
- * Harmonious completion chime for when Tasbeeh reaches 33 or 99
+ * Harmonious completion chime for when Tasbeeh reaches 33 or 99 or on periodic reminder
  */
 export function playCompletionChime() {
   try {
@@ -56,14 +71,14 @@ export function playCompletionChime() {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, startTime);
 
-      gain.gain.setValueAtTime(0.2, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.6);
+      gain.gain.setValueAtTime(0.25, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.7);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
 
       osc.start(startTime);
-      osc.stop(startTime + 0.6);
+      osc.stop(startTime + 0.7);
     });
   } catch (e) {
     console.debug('Chime silent fallback', e);
@@ -93,7 +108,7 @@ export const AUTHENTIC_ADHAN_URLS: Record<AdhanVoiceId, string> = {
 };
 
 /**
- * Plays authentic Adhan audio recording.
+ * Plays authentic Adhan audio recording with MediaSession lock-screen integration.
  */
 export function playAdhan(
   voice: AdhanVoiceId = 'makkah',
@@ -108,6 +123,43 @@ export function playAdhan(
   audio.crossOrigin = 'anonymous';
   currentAdhanAudio = audio;
 
+  // Request WakeLock to prevent screen lock sleep during Adhan
+  if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
+    (navigator as any).wakeLock.request('screen').then((sentinel: any) => {
+      wakeLockSentinel = sentinel;
+    }).catch(() => {});
+  }
+
+  // Setup OS Lock Screen Media Controls via MediaSession API
+  if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
+    const titles: Record<AdhanVoiceId, string> = {
+      makkah: 'أذان الحرم المكي الشريف',
+      abdulbasit: 'أذان الشيخ عبد الباسط عبد الصمد',
+      abdulghaffar: 'أذان الشيخ عبد الغفار',
+      abdulhakam: 'أذان الشيخ عبد الحكم',
+      egypt: 'أذان جمهورية مصر العربية',
+    };
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: titles[voice] || 'أذان الصلاة',
+      artist: 'تطبيق «المسلم»',
+      album: 'مواقيت الصلاة والأذان',
+      artwork: [
+        { src: './icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: './icon-512.png', sizes: '512x512', type: 'image/png' },
+      ],
+    });
+
+    navigator.mediaSession.setActionHandler('stop', () => {
+      stopAdhan();
+      if (onEnd) onEnd();
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+      stopAdhan();
+      if (onEnd) onEnd();
+    });
+  }
+
   audio.addEventListener('ended', () => {
     stopAdhan();
     if (onEnd) onEnd();
@@ -115,21 +167,59 @@ export function playAdhan(
 
   audio.addEventListener('error', (err) => {
     console.warn('Adhan stream fallback error:', err);
-    // If network fails, try the alternative Makkah track
+    // If primary network stream fails, fallback to Makkah or synthesize Takbeer
     if (voice !== 'makkah') {
       playAdhan('makkah', onEnd);
-    } else if (onEnd) {
-      onEnd();
+    } else {
+      // Synthesize Takbeer audio if audio files are offline
+      playSynthesizedTakbeer(onEnd);
     }
   });
 
   audio.play().catch((err) => {
-    console.info('Adhan auto-play or playback notice:', err);
+    console.info('Adhan auto-play notice:', err);
+    playSynthesizedTakbeer(onEnd);
   });
 
   return () => {
     stopAdhan();
   };
+}
+
+/**
+ * Offline Synthesized Takbeer Melody via Web Audio API if network is unavailable
+ */
+export function playSynthesizedTakbeer(onEnd?: () => void) {
+  try {
+    const ctx = getAudioContext();
+    // Notes approximating "Allahu Akbar": G3, C4, D4, E4, C4
+    const notes = [196, 261.63, 293.66, 329.63, 261.63];
+    const duration = 0.5;
+
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const startTime = ctx.currentTime + idx * (duration + 0.05);
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, startTime);
+
+      gain.gain.setValueAtTime(0.3, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    });
+
+    setTimeout(() => {
+      if (onEnd) onEnd();
+    }, notes.length * (duration + 0.05) * 1000);
+  } catch (e) {
+    if (onEnd) onEnd();
+  }
 }
 
 export function stopAdhan() {
@@ -141,6 +231,15 @@ export function stopAdhan() {
       // ignore
     }
     currentAdhanAudio = null;
+  }
+
+  if (wakeLockSentinel) {
+    try {
+      wakeLockSentinel.release();
+    } catch {
+      // ignore
+    }
+    wakeLockSentinel = null;
   }
 }
 

@@ -45,10 +45,18 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
 }) => {
   const t = getTranslation(language);
 
-  // Active City and District state
-  const [selectedCity, setSelectedCity] = useState<CityLocation>(
-    language === 'tr' ? POPULAR_CITIES[0] : POPULAR_CITIES[2]
-  );
+  // Active City and District state with localStorage persistence
+  const [selectedCity, setSelectedCity] = useState<CityLocation>(() => {
+    const saved = localStorage.getItem('almuslim_saved_city');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return language === 'tr' ? POPULAR_CITIES[0] : POPULAR_CITIES[2];
+  });
   const [isCityModalOpen, setIsCityModalOpen] = useState(false);
   const [citySearchQuery, setCitySearchQuery] = useState('');
   const [isLocatingGPS, setIsLocatingGPS] = useState(false);
@@ -92,7 +100,7 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
   const hijriDate = getHijriDate(currentTime);
   const qiblaInfo = calculateQibla(selectedCity.latitude, selectedCity.longitude);
 
-  // High Precision GPS with Reverse Geocoding for Exact District & City
+  // High Precision GPS with Reverse Geocoding for Exact District (الحي) & City
   const handleDetectGPS = () => {
     if (!navigator.geolocation) {
       setLocationStatus(t.locationError);
@@ -109,25 +117,54 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
         let countryName = '';
 
         try {
-          // Accurate free reverse geocoding
-          const res = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=${language}`
+          // 1. Try OpenStreetMap Nominatim for exact neighborhood / suburb / quarter
+          const nominatimRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&accept-language=${language}`
           );
-          if (res.ok) {
-            const data = await res.json();
-            districtName = data.locality || data.district || '';
-            cityName = data.city || data.principalSubdivision || cityName;
-            countryName = data.countryName || '';
+          if (nominatimRes.ok) {
+            const data = await nominatimRes.json();
+            const addr = data.address || {};
+            districtName = addr.neighbourhood || addr.suburb || addr.quarter || addr.residential || addr.city_district || addr.district || '';
+            cityName = addr.city || addr.town || addr.village || addr.municipality || addr.state || cityName;
+            countryName = addr.country || '';
           }
         } catch (e) {
-          console.warn('Reverse geocoding notice:', e);
+          console.debug('Nominatim notice, trying secondary geocoder...', e);
+        }
+
+        // 2. If districtName still empty, try BigDataCloud
+        if (!districtName) {
+          try {
+            const bdcRes = await fetch(
+              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=${language}`
+            );
+            if (bdcRes.ok) {
+              const data = await bdcRes.json();
+              districtName = data.locality || data.district || '';
+              if (!cityName || cityName === 'موقعي الحالي' || cityName === 'Mevcut Konumum') {
+                cityName = data.city || data.principalSubdivision || cityName;
+              }
+              if (!countryName) countryName = data.countryName || '';
+            }
+          } catch (e) {
+            console.debug('BigDataCloud geocoder notice:', e);
+          }
+        }
+
+        // Clean up district formatting (e.g. ensure 'حي ' prefix in Arabic)
+        let formattedDistrictAr: string | undefined = undefined;
+        let formattedDistrictTr: string | undefined = undefined;
+
+        if (districtName) {
+          formattedDistrictAr = districtName.startsWith('حي') ? districtName : `حي ${districtName}`;
+          formattedDistrictTr = `${districtName} Mahallesi`;
         }
 
         const gpsCity: CityLocation = {
           nameAr: cityName,
           nameTr: cityName,
-          districtAr: districtName ? `${language === 'ar' ? 'حي ' : ''}${districtName}` : undefined,
-          districtTr: districtName ? `${districtName} ${language === 'tr' ? 'Mahallesi' : ''}` : undefined,
+          districtAr: formattedDistrictAr,
+          districtTr: formattedDistrictTr,
           countryAr: countryName || 'إحداثيات GPS',
           countryTr: countryName || 'GPS Koordinatı',
           latitude,
@@ -137,9 +174,13 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
         };
 
         setSelectedCity(gpsCity);
+        localStorage.setItem('almuslim_saved_city', JSON.stringify(gpsCity));
         setIsLocatingGPS(false);
-        setLocationStatus(`${t.locationGranted} (±${Math.round(accuracy || 10)} ${t.meters})`);
-        setTimeout(() => setLocationStatus(null), 3500);
+
+        const accuracyLabel = `(±${Math.round(accuracy || 10)} ${t.meters})`;
+        const districtLabel = formattedDistrictAr ? ` - ${formattedDistrictAr}` : '';
+        setLocationStatus(`${t.locationGranted}${districtLabel} ${accuracyLabel}`);
+        setTimeout(() => setLocationStatus(null), 4500);
       },
       (err) => {
         console.warn('Geolocation error:', err);
@@ -421,6 +462,7 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
                   key={idx}
                   onClick={() => {
                     setSelectedCity(city);
+                    localStorage.setItem('almuslim_saved_city', JSON.stringify(city));
                     setIsCityModalOpen(false);
                   }}
                   className={`w-full text-start p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${

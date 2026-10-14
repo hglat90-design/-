@@ -28,6 +28,25 @@ export interface CalculationMethod {
   ishaInterval?: number; // minutes after maghrib (e.g. Makkah)
 }
 
+export interface CustomReminderItem {
+  id: string;
+  titleAr: string;
+  titleTr: string;
+  time: string; // HH:mm
+  enabled: boolean;
+  days: number[]; // 0-6 (0 is Sunday)
+  soundEnabled?: boolean;
+}
+
+export interface PeriodicReminderConfig {
+  enabled: boolean;
+  intervalMinutes: number; // 1, 5, 10, 15, 30, 60
+  dhikrTextAr: string;
+  dhikrTextTr: string;
+  soundEnabled: boolean;
+  vibrationEnabled: boolean;
+}
+
 export type JuristicMethod = 'shafii' | 'hanafi'; // Shadow factor for Asr (1x vs 2x)
 
 export interface CityLocation {
