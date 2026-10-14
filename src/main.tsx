@@ -87,33 +87,17 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-// Android WebView & Sketchware compatibility handler:
-// If running in a WebView or if the standalone lightweight engine is active,
-// preserve the instant, zero-dependency pure Vanilla HTML/CSS DOM to prevent freezing.
-const isWebView = typeof navigator !== 'undefined' && (
-  /wv|Android.*Version\/[0-9.]+|Sketchware|AppCreator24/i.test(navigator.userAgent) || 
-  (typeof window !== 'undefined' && window.location.protocol === 'file:')
-);
-
-const isVanillaMode = typeof window !== 'undefined' && (
-  (window as any).__STANDALONE_WEBVIEW_MODE__ && (isWebView || window.location.search.includes('vanilla=true') || !window.location.search.includes('react=true'))
-);
-
-if (!isVanillaMode) {
-  try {
-    const rootElement = document.getElementById('root');
-    if (rootElement) {
-      createRoot(rootElement).render(
-        <React.StrictMode>
-          <ErrorBoundary>
-            <App />
-          </ErrorBoundary>
-        </React.StrictMode>
-      );
-    }
-  } catch (mountError) {
-    console.error('Initial React Mount Error:', mountError);
+try {
+  const rootElement = document.getElementById('root');
+  if (rootElement) {
+    createRoot(rootElement).render(
+      <React.StrictMode>
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
+      </React.StrictMode>
+    );
   }
-} else {
-  console.log('Al-Muslim: Running in ultra-lightweight Vanilla HTML/CSS/JS mode for 100% Android WebView compatibility.');
+} catch (mountError) {
+  console.error('Initial React Mount Error:', mountError);
 }
