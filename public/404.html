@@ -5,8 +5,9 @@
     <title>المسلم - Al-Muslim</title>
     <script>
       // Single Page Apps for GitHub Pages
-      // Redirects 404 to index.html with the route path
-      var pathSegmentsToKeep = 0;
+      // Auto-detect whether it's a project page (username.github.io/repo) or custom domain
+      var isGithubPages = window.location.hostname.endsWith('github.io');
+      var pathSegmentsToKeep = isGithubPages ? 1 : 0;
       var l = window.location;
       l.replace(
         l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +

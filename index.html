@@ -13,13 +13,50 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="manifest.webmanifest" />
+
+    <!-- GitHub Pages Trailing Slash & SPA Redirect Handling -->
+    <script>
+      (function(l) {
+        if (l.search[1] === '/' ) {
+          var decoded = l.search.slice(1).split('&').map(function(s) { 
+            return s.replace(/~and~/g, '&')
+          }).join('?');
+          window.history.replaceState(null, null,
+              l.pathname.slice(0, -1) + decoded + l.hash
+          );
+        }
+      }(window.location));
+
+      if (window.location.hostname.endsWith('github.io') && 
+          !window.location.pathname.endsWith('/') && 
+          !window.location.pathname.split('/').pop().includes('.')) {
+        window.location.replace(window.location.pathname + '/' + window.location.search + window.location.hash);
+      }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@300;400;500;600;700;800&family=Scheherazade+New:wght@400;700&display=swap" rel="stylesheet">
   </head>
-  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
-    <div id="root"></div>
+  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500/30 selection:text-emerald-200" style="background-color: #020617; margin: 0; min-height: 100vh;">
+    <div id="root">
+      <!-- High-fidelity Islamic Loading Screen preventing any White Screen flickering -->
+      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #020617; color: #f8fafc; font-family: 'Cairo', system-ui, -apple-system, sans-serif; text-align: center; padding: 20px; direction: rtl;">
+        <div style="width: 70px; height: 70px; border-radius: 20px; background: linear-scale(135deg, #059669, #064e3b); display: flex; align-items: center; justify-content: center; font-size: 34px; margin-bottom: 16px; border: 1px solid rgba(245, 158, 11, 0.4); box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.4);">
+          🕋
+        </div>
+        <div style="font-size: 26px; font-weight: 800; color: #f59e0b; margin-bottom: 6px;">
+          المسلم · Al-Muslim
+        </div>
+        <div style="font-size: 13px; color: #34d399; margin-bottom: 24px;">
+          رفيقك الإيماني اليومي
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #94a3b8;">
+          <div style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></div>
+          <span>جارٍ تجهيز مواقيت الصلاة والمصحف الشريف...</span>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
