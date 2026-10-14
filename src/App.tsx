@@ -9,9 +9,6 @@ import { AzkarScreen } from './components/AzkarScreen';
 import { TasbeehScreen } from './components/TasbeehScreen';
 import { CalendarScreen } from './components/CalendarScreen';
 import { SettingsScreen } from './components/SettingsScreen';
-import { AndroidCodeModal } from './components/AndroidCodeModal';
-import { InstallAppModal } from './components/InstallAppModal';
-import { isAdhanPlaying } from './utils/soundEffects';
 
 export default function App() {
   // App-wide Language state (Default Arabic as requested, with instant Turkish switcher)
@@ -25,12 +22,6 @@ export default function App() {
 
   // Adhan active audio playback state
   const [isAdhanActive, setIsAdhanActive] = useState<boolean>(false);
-
-  // Android Studio Code Explorer modal
-  const [isCodeModalOpen, setIsCodeModalOpen] = useState<boolean>(false);
-
-  // Install App on Phone Modal
-  const [isInstallModalOpen, setIsInstallModalOpen] = useState<boolean>(false);
 
   // App Settings state
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -87,14 +78,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex justify-center font-cairo antialiased">
-      {/* Mobile-centric Android Container (max-w-lg) */}
+      {/* Mobile Consumer Android Device Container (max-w-lg) */}
       <div className="w-full max-w-lg min-h-screen flex flex-col bg-slate-950 border-x border-slate-900/80 shadow-2xl relative">
-        {/* Android Status Bar & Top App Bar */}
+        {/* Clean Android Top App Bar */}
         <AndroidHeader
           language={language}
           onLanguageChange={handleLanguageChange}
-          onOpenCodeExplorer={() => setIsCodeModalOpen(true)}
-          onOpenInstallModal={() => setIsInstallModalOpen(true)}
           isAdhanActive={isAdhanActive}
         />
 
@@ -133,7 +122,6 @@ export default function App() {
             <SettingsScreen
               settings={settings}
               onUpdateSettings={setSettings}
-              onOpenCodeExplorer={() => setIsCodeModalOpen(true)}
             />
           )}
         </main>
@@ -142,20 +130,6 @@ export default function App() {
         <BottomNavBar
           currentTab={currentTab}
           onTabChange={setCurrentTab}
-          language={language}
-        />
-
-        {/* Android Studio Code Explorer & Project Downloader Modal */}
-        <AndroidCodeModal
-          isOpen={isCodeModalOpen}
-          onClose={() => setIsCodeModalOpen(false)}
-          language={language}
-        />
-
-        {/* Install on Android Phone Modal */}
-        <InstallAppModal
-          isOpen={isInstallModalOpen}
-          onClose={() => setIsInstallModalOpen(false)}
           language={language}
         />
       </div>

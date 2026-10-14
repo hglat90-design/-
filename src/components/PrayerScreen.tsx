@@ -6,10 +6,11 @@ import {
   Compass, 
   ChevronDown, 
   Radio, 
-  Sparkles,
   ShieldCheck,
   RotateCw,
-  Search
+  Search,
+  Navigation,
+  Waves
 } from 'lucide-react';
 import { 
   AppSettings, 
@@ -44,7 +45,7 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
 }) => {
   const t = getTranslation(language);
 
-  // Active City state (default to Istanbul for Turkey/Diyanet or Makkah)
+  // Active City and District state
   const [selectedCity, setSelectedCity] = useState<CityLocation>(
     language === 'tr' ? POPULAR_CITIES[0] : POPULAR_CITIES[2]
   );
@@ -91,7 +92,7 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
   const hijriDate = getHijriDate(currentTime);
   const qiblaInfo = calculateQibla(selectedCity.latitude, selectedCity.longitude);
 
-  // Handle GPS detection
+  // High Precision GPS with Reverse Geocoding for Exact District & City
   const handleDetectGPS = () => {
     if (!navigator.geolocation) {
       setLocationStatus(t.locationError);
@@ -101,21 +102,44 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
     setLocationStatus(t.locating);
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
+      async (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        let districtName = '';
+        let cityName = language === 'ar' ? 'موقعي الحالي' : 'Mevcut Konumum';
+        let countryName = '';
+
+        try {
+          // Accurate free reverse geocoding
+          const res = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=${language}`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            districtName = data.locality || data.district || '';
+            cityName = data.city || data.principalSubdivision || cityName;
+            countryName = data.countryName || '';
+          }
+        } catch (e) {
+          console.warn('Reverse geocoding notice:', e);
+        }
+
         const gpsCity: CityLocation = {
-          nameAr: 'موقعي الحالي',
-          nameTr: 'Mevcut Konumum',
-          countryAr: 'إحداثيات GPS',
-          countryTr: 'GPS Koordinatı',
+          nameAr: cityName,
+          nameTr: cityName,
+          districtAr: districtName ? `${language === 'ar' ? 'حي ' : ''}${districtName}` : undefined,
+          districtTr: districtName ? `${districtName} ${language === 'tr' ? 'Mahallesi' : ''}` : undefined,
+          countryAr: countryName || 'إحداثيات GPS',
+          countryTr: countryName || 'GPS Koordinatı',
           latitude,
           longitude,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          accuracyMeters: Math.round(accuracy || 10),
         };
+
         setSelectedCity(gpsCity);
         setIsLocatingGPS(false);
-        setLocationStatus(t.locationGranted);
-        setTimeout(() => setLocationStatus(null), 3000);
+        setLocationStatus(`${t.locationGranted} (±${Math.round(accuracy || 10)} ${t.meters})`);
+        setTimeout(() => setLocationStatus(null), 3500);
       },
       (err) => {
         console.warn('Geolocation error:', err);
@@ -123,11 +147,11 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
         setLocationStatus(t.locationError);
         setTimeout(() => setLocationStatus(null), 3500);
       },
-      { timeout: 10000, enableHighAccuracy: true }
+      { timeout: 15000, enableHighAccuracy: true, maximumAge: 0 }
     );
   };
 
-  // Toggle Adhan playback
+  // Toggle authentic Adhan audio playback
   const handleToggleAdhan = () => {
     if (isAdhanPlaying) {
       stopAdhan();
@@ -163,27 +187,35 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
     c.countryAr.includes(citySearchQuery)
   );
 
+  const displayDistrict = language === 'ar' ? selectedCity.districtAr : selectedCity.districtTr;
+
   return (
     <div className="space-y-4 pb-4">
-      {/* City & GPS Selector Bar */}
-      <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800/80 rounded-2xl p-3 shadow-sm">
+      {/* City & High-Precision District Bar */}
+      <div className="flex items-center justify-between bg-slate-900/80 border border-emerald-900/40 rounded-2xl p-3 shadow-md">
         <button
           onClick={() => setIsCityModalOpen(true)}
-          className="flex items-center gap-2 text-start group cursor-pointer"
+          className="flex items-center gap-2.5 text-start group cursor-pointer"
         >
-          <div className="w-8 h-8 rounded-xl bg-emerald-950/80 border border-emerald-700/40 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-900/60 transition-colors">
-            <MapPin className="w-4 h-4 text-emerald-400" />
+          <div className="w-9 h-9 rounded-xl bg-emerald-950 border border-emerald-600/40 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-900/60 transition-colors shadow-inner">
+            <MapPin className="w-4 h-4 text-amber-400" />
           </div>
           <div>
-            <div className="flex items-center gap-1">
-              <span className="font-semibold text-sm text-slate-100 font-cairo">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-sm text-slate-100 font-cairo">
+                {displayDistrict ? `${displayDistrict}، ` : ''}
                 {language === 'ar' ? selectedCity.nameAr : selectedCity.nameTr}
               </span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-400 transition-colors" />
             </div>
-            <span className="text-[11px] text-slate-400 block">
-              {language === 'ar' ? selectedCity.countryAr : selectedCity.countryTr}
-            </span>
+            <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+              <span>{language === 'ar' ? selectedCity.countryAr : selectedCity.countryTr}</span>
+              {selectedCity.accuracyMeters && (
+                <span className="text-[10px] text-emerald-400 font-mono font-semibold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/40">
+                  GPS ±{selectedCity.accuracyMeters}{t.meters}
+                </span>
+              )}
+            </div>
           </div>
         </button>
 
@@ -191,25 +223,25 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
         <button
           onClick={handleDetectGPS}
           disabled={isLocatingGPS}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 text-xs text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-900/80 to-slate-900 hover:from-emerald-800 hover:to-slate-800 text-xs text-emerald-300 border border-emerald-600/40 transition-all shadow-sm cursor-pointer active:scale-95"
         >
-          <RotateCw className={`w-3.5 h-3.5 text-emerald-400 ${isLocatingGPS ? 'animate-spin' : ''}`} />
-          <span className="text-[11px] font-medium">{t.autoLocation}</span>
+          <Navigation className={`w-3.5 h-3.5 text-amber-400 ${isLocatingGPS ? 'animate-spin' : ''}`} />
+          <span className="text-[11px] font-bold font-cairo">{t.autoLocation}</span>
         </button>
       </div>
 
       {locationStatus && (
-        <div className="p-2 rounded-xl bg-emerald-950/70 border border-emerald-600/40 text-emerald-300 text-xs text-center animate-fade-in">
+        <div className="p-2.5 rounded-xl bg-emerald-950 border border-emerald-500/50 text-emerald-200 text-xs text-center font-medium shadow-md">
           {locationStatus}
         </div>
       )}
 
       {/* Date Banner */}
       <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-        <span className="text-emerald-400/90 font-medium font-cairo">
+        <span className="text-amber-300/90 font-bold font-cairo">
           {language === 'ar' ? hijriDate.formattedAr : hijriDate.formattedTr}
         </span>
-        <span>
+        <span className="text-slate-400 font-medium">
           {currentTime.toLocaleDateString(language === 'ar' ? 'ar-SA' : 'tr-TR', {
             weekday: 'long',
             day: 'numeric',
@@ -220,14 +252,13 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
       </div>
 
       {/* Hero Next Prayer Card (Islamic Emerald & Gold) */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-950 via-slate-900 to-emerald-900 border border-emerald-500/30 p-5 shadow-xl shadow-emerald-950/40">
-        {/* Subtle geometric background motif */}
-        <div className="absolute top-0 right-0 -mt-6 -mr-6 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -mb-6 -ml-6 w-36 h-36 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-950 via-slate-900 to-emerald-900 border border-emerald-500/30 p-5 shadow-xl shadow-emerald-950/50">
+        <div className="absolute top-0 right-0 -mt-6 -mr-6 w-40 h-40 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -mb-6 -ml-6 w-40 h-40 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative z-10">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-medium">
+            <div className="flex items-center gap-1.5 text-emerald-300 text-xs font-semibold">
               <Radio className="w-3.5 h-3.5 animate-pulse text-amber-400" />
               <span>{t.nextPrayer}</span>
             </div>
@@ -235,34 +266,34 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
             {/* Quick Qibla Link */}
             <button
               onClick={onNavigateToQibla}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-900/60 hover:bg-emerald-800/60 border border-emerald-700/50 text-[11px] text-amber-300 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-900/80 hover:bg-emerald-800 border border-emerald-600/50 text-xs text-amber-300 transition-colors cursor-pointer"
             >
-              <Compass className="w-3 h-3 text-amber-300" />
+              <Compass className="w-3.5 h-3.5 text-amber-300" />
               <span>{qiblaInfo.directionDeg}° {t.qiblaDirection}</span>
             </button>
           </div>
 
           {/* Prayer Name & Countdown */}
           <div className="mt-3 text-center">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100 font-cairo tracking-wide">
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-100 font-cairo tracking-wide">
               {getPrayerDisplayName(nextPrayerInfo.nextPrayer)}
             </h2>
-            <div className="text-xs text-emerald-300/80 mt-0.5">
+            <div className="text-xs text-emerald-300/90 mt-0.5 font-mono">
               {nextPrayerInfo.nextPrayerTime}
             </div>
 
             {/* Large Countdown Display */}
-            <div className="mt-3 py-2 px-4 inline-block rounded-2xl bg-slate-950/70 border border-emerald-500/20 shadow-inner">
-              <span className="text-3xl sm:text-4xl font-black font-mono tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-300">
+            <div className="mt-3.5 py-2.5 px-6 inline-block rounded-2xl bg-slate-950/80 border border-emerald-500/30 shadow-inner">
+              <span className="text-3xl sm:text-5xl font-black font-mono tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-yellow-300">
                 {nextPrayerInfo.formattedRemaining}
               </span>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1 font-semibold">
                 {t.timeRemaining}
               </p>
             </div>
           </div>
 
-          {/* Progress Bar of prayer time interval */}
+          {/* Progress Bar */}
           <div className="mt-4">
             <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
               <div 
@@ -272,16 +303,23 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
             </div>
           </div>
 
-          {/* Adhan Audio Test & Control Button */}
-          <div className="mt-4 pt-3 border-t border-emerald-900/40 flex items-center justify-between">
-            <div className="text-[11px] text-slate-400 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{CALCULATION_METHODS[settings.calcMethod]?.nameTr || 'Diyanet / MWL'}</span>
+          {/* Authentic Real Adhan Playback Banner & Control */}
+          <div className="mt-4 pt-3.5 border-t border-emerald-900/50 flex items-center justify-between">
+            <div className="text-xs text-slate-300 flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div className="truncate max-w-[170px] sm:max-w-xs">
+                <span className="text-slate-400 text-[10px] block leading-none">
+                  {t.adhanAlarm}:
+                </span>
+                <span className="font-semibold text-amber-300 text-[11px] truncate block font-cairo">
+                  {t[`${settings.adhanVoice}Adhan` as keyof typeof t] || t.makkahAdhan}
+                </span>
+              </div>
             </div>
 
             <button
               onClick={handleToggleAdhan}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-md cursor-pointer ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg cursor-pointer ${
                 isAdhanPlaying
                   ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse'
                   : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950'
@@ -289,13 +327,13 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
             >
               {isAdhanPlaying ? (
                 <>
-                  <VolumeX className="w-3.5 h-3.5" />
-                  <span>{t.stopAdhan}</span>
+                  <VolumeX className="w-4 h-4" />
+                  <span className="font-cairo">{t.stopAdhan}</span>
                 </>
               ) : (
                 <>
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span>{t.testAdhan}</span>
+                  <Volume2 className="w-4 h-4 text-slate-950" />
+                  <span className="font-cairo">{t.testAdhan}</span>
                 </>
               )}
             </button>
@@ -303,16 +341,16 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
         </div>
       </div>
 
-      {/* Daily Prayer Times List */}
-      <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-3.5 space-y-1.5 shadow-sm">
-        <h3 className="text-xs font-bold text-slate-300 px-2 py-1 flex items-center justify-between">
+      {/* Daily Prayer Times Matrix */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-4 space-y-2 shadow-sm">
+        <div className="flex items-center justify-between text-xs font-bold text-slate-200 px-1 pb-1">
           <span>{t.allPrayers}</span>
-          <span className="text-[10px] text-slate-400 font-normal">
-            {settings.juristicMethod === 'hanafi' ? t.hanafi : t.shafiiStandard}
+          <span className="text-[11px] text-emerald-400 font-medium">
+            {CALCULATION_METHODS[settings.calcMethod]?.nameAr || 'رئاسة الشؤون الدينية'}
           </span>
-        </h3>
+        </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {prayerNamesList.map((prayer) => {
             const isNext = nextPrayerInfo.nextPrayer === prayer.id;
             const timeValue = prayerTimes[prayer.id];
@@ -320,22 +358,22 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
             return (
               <div
                 key={prayer.id}
-                className={`p-3 rounded-2xl border transition-all flex flex-col justify-between ${
+                className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between ${
                   isNext
-                    ? 'bg-gradient-to-br from-emerald-950 to-slate-900 border-amber-500/50 shadow-md shadow-emerald-950'
-                    : 'bg-slate-900/40 border-slate-800/60 hover:border-slate-700/60'
+                    ? 'bg-gradient-to-br from-emerald-950 to-slate-900 border-amber-400 shadow-md shadow-emerald-950'
+                    : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className={`text-xs font-semibold font-cairo ${isNext ? 'text-amber-300' : 'text-slate-300'}`}>
+                  <span className={`text-xs font-bold font-cairo ${isNext ? 'text-amber-300' : 'text-slate-300'}`}>
                     {prayer.ar}
                   </span>
                   {isNext && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
                   )}
                 </div>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-lg font-bold font-mono tracking-tight text-slate-100">
+                <div className="mt-2.5 flex items-baseline justify-between">
+                  <span className="text-xl font-extrabold font-mono tracking-tight text-slate-100">
                     {timeValue}
                   </span>
                   <span className="text-[10px] text-slate-400">
@@ -348,24 +386,9 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
         </div>
       </div>
 
-      {/* Background Adhan Foreground Service Guarantee Card */}
-      <div className="p-3.5 rounded-2xl bg-slate-900/40 border border-emerald-900/40 flex items-start gap-3 text-xs">
-        <div className="p-2 rounded-xl bg-emerald-950/80 text-emerald-400 border border-emerald-700/30 shrink-0">
-          <Sparkles className="w-4 h-4 text-amber-300" />
-        </div>
-        <div className="text-slate-300">
-          <p className="font-semibold text-emerald-300 text-xs">
-            {t.notificationsTitle}
-          </p>
-          <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-            {t.backgroundServiceNotice}
-          </p>
-        </div>
-      </div>
-
-      {/* City Selector Modal */}
+      {/* City & District Selector Modal */}
       {isCityModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-5 max-h-[85vh] flex flex-col shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="font-bold text-base text-slate-100 font-cairo">
@@ -391,7 +414,7 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
               />
             </div>
 
-            {/* Cities List */}
+            {/* Popular Cities List */}
             <div className="mt-3 overflow-y-auto space-y-1.5 flex-1 pr-1">
               {filteredCities.map((city, idx) => (
                 <button
@@ -402,7 +425,7 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
                   }}
                   className={`w-full text-start p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
                     selectedCity.nameAr === city.nameAr
-                      ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200'
+                      ? 'bg-emerald-950 border-emerald-500 text-emerald-200'
                       : 'bg-slate-950/40 border-slate-800/80 hover:bg-slate-800/60 text-slate-300'
                   }`}
                 >

@@ -33,11 +33,14 @@ export type JuristicMethod = 'shafii' | 'hanafi'; // Shadow factor for Asr (1x v
 export interface CityLocation {
   nameAr: string;
   nameTr: string;
+  districtAr?: string;
+  districtTr?: string;
   countryAr: string;
   countryTr: string;
   latitude: number;
   longitude: number;
   timezone: string;
+  accuracyMeters?: number;
 }
 
 export interface QuranSurah {
@@ -91,11 +94,13 @@ export interface IslamicEvent {
   descriptionTr: string;
 }
 
+export type AdhanVoiceId = 'makkah' | 'abdulbasit' | 'abdulghaffar' | 'abdulhakam' | 'egypt';
+
 export interface AppSettings {
   language: Language;
   calcMethod: CalculationMethodId;
   juristicMethod: JuristicMethod;
-  adhanVoice: 'makkah' | 'madinah' | 'istanbul' | 'alaqsa' | 'takbeer';
+  adhanVoice: AdhanVoiceId;
   adhanEnabled: Record<PrayerName, boolean>;
   quranFontSize: number;
   isDarkMode: boolean;
