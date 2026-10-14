@@ -18,11 +18,12 @@ import {
 import { stopAdhan, unlockAudioContext } from './utils/soundEffects';
 import { calculatePrayerTimes, POPULAR_CITIES } from './utils/prayerCalculator';
 import { getTranslation } from './translations';
+import { safeStorage } from './utils/safeStorage';
 
 export default function App() {
   // App-wide Language state (Default Arabic as requested, with instant Turkish switcher)
   const [language, setLanguage] = useState<Language>(() => {
-    const saved = localStorage.getItem('almuslim_lang');
+    const saved = safeStorage.getItem('almuslim_lang');
     return (saved === 'tr' ? 'tr' : 'ar') as Language;
   });
 
@@ -34,13 +35,13 @@ export default function App() {
 
   // Automatic Adhan state (persisted, default true)
   const [isAutoAdhanEnabled, setIsAutoAdhanEnabled] = useState<boolean>(() => {
-    const saved = localStorage.getItem('almuslim_auto_adhan');
+    const saved = safeStorage.getItem('almuslim_auto_adhan');
     return saved !== null ? saved === 'true' : true;
   });
 
   // Periodic Dhikr Reminder Config (Defaults to enabled every 5 minutes!)
   const [periodicConfig, setPeriodicConfig] = useState<PeriodicReminderConfig>(() => {
-    const saved = localStorage.getItem('almuslim_periodic_dhikr');
+    const saved = safeStorage.getItem('almuslim_periodic_dhikr');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -60,7 +61,7 @@ export default function App() {
 
   // Custom Scheduled Reminders
   const [customReminders, setCustomReminders] = useState<CustomReminderItem[]>(() => {
-    const saved = localStorage.getItem('almuslim_custom_reminders');
+    const saved = safeStorage.getItem('almuslim_custom_reminders');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -110,7 +111,7 @@ export default function App() {
 
   // App Settings state
   const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('almuslim_settings');
+    const saved = safeStorage.getItem('almuslim_settings');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -176,28 +177,28 @@ export default function App() {
       html.setAttribute('dir', 'ltr');
       html.setAttribute('lang', 'tr');
     }
-    localStorage.setItem('almuslim_lang', language);
+    safeStorage.setItem('almuslim_lang', language);
     setSettings((prev) => ({ ...prev, language }));
   }, [language]);
 
   // Persist settings
   useEffect(() => {
-    localStorage.setItem('almuslim_settings', JSON.stringify(settings));
+    safeStorage.setItem('almuslim_settings', JSON.stringify(settings));
   }, [settings]);
 
   // Persist auto adhan state
   useEffect(() => {
-    localStorage.setItem('almuslim_auto_adhan', String(isAutoAdhanEnabled));
+    safeStorage.setItem('almuslim_auto_adhan', String(isAutoAdhanEnabled));
   }, [isAutoAdhanEnabled]);
 
   // Persist periodic dhikr config
   useEffect(() => {
-    localStorage.setItem('almuslim_periodic_dhikr', JSON.stringify(periodicConfig));
+    safeStorage.setItem('almuslim_periodic_dhikr', JSON.stringify(periodicConfig));
   }, [periodicConfig]);
 
   // Persist custom reminders
   useEffect(() => {
-    localStorage.setItem('almuslim_custom_reminders', JSON.stringify(customReminders));
+    safeStorage.setItem('almuslim_custom_reminders', JSON.stringify(customReminders));
   }, [customReminders]);
 
   // Start live Prayer Adhan watcher, Periodic 5-minute Dhikr reminder, and Custom Reminders

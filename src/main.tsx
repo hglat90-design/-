@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { safeStorage } from './utils/safeStorage';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -27,7 +28,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   handleReload = () => {
-    localStorage.removeItem('almuslim_settings');
+    safeStorage.removeItem('almuslim_settings');
+    safeStorage.removeItem('almuslim_saved_city');
     window.location.reload();
   };
 
@@ -44,7 +46,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           color: '#f8fafc',
           padding: '24px',
           textAlign: 'center',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
+          fontFamily: 'Cairo, system-ui, -apple-system, sans-serif',
           direction: 'rtl'
         }}>
           <div style={{
@@ -60,7 +62,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               تطبيق «المسلم»
             </h1>
             <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: '1.6', marginBottom: '20px' }}>
-              حدث خطأ أثناء تحميل بعض البيانات. يمكنك إعادة تحميل الصفحة وإعادة ضبط الإعدادات للبدء من جديد.
+              حدثت استعادة للنظام لتفادي أي تعليق في WebView أو المتصفح. يمكنك المتابعة الآن مباشرة.
             </p>
             <button
               onClick={this.handleReload}
@@ -75,7 +77,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 cursor: 'pointer'
               }}
             >
-              إعادة تحميل التطبيق
+              دخول التطبيق الآن
             </button>
           </div>
         </div>
@@ -85,10 +87,17 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+try {
+  const rootElement = document.getElementById('root');
+  if (rootElement) {
+    createRoot(rootElement).render(
+      <React.StrictMode>
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
+      </React.StrictMode>
+    );
+  }
+} catch (mountError) {
+  console.error('Initial React Mount Error:', mountError);
+}

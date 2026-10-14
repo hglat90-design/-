@@ -29,6 +29,7 @@ import {
 } from '../utils/prayerCalculator';
 import { getHijriDate } from '../utils/hijriCalendar';
 import { playAdhan, stopAdhan } from '../utils/soundEffects';
+import { safeStorage } from '../utils/safeStorage';
 
 interface PrayerScreenProps {
   language: Language;
@@ -45,9 +46,9 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
 }) => {
   const t = getTranslation(language);
 
-  // Active City and District state with localStorage persistence
+  // Active City and District state with safeStorage persistence
   const [selectedCity, setSelectedCity] = useState<CityLocation>(() => {
-    const saved = localStorage.getItem('almuslim_saved_city');
+    const saved = safeStorage.getItem('almuslim_saved_city');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -100,7 +101,7 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
   const hijriDate = getHijriDate(currentTime);
   const qiblaInfo = calculateQibla(selectedCity.latitude, selectedCity.longitude);
 
-  // High Precision GPS with Reverse Geocoding for Exact District (الحي) & City
+  // High Precision GPS with Reverse Geocoding for Exact District (الحي) & City (Never hangs if GPS is off)
   const handleDetectGPS = () => {
     if (!navigator.geolocation) {
       setLocationStatus(t.locationError);
@@ -109,8 +110,26 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
     setIsLocatingGPS(true);
     setLocationStatus(t.locating);
 
+    let finished = false;
+    const safetyTimer = setTimeout(() => {
+      if (!finished) {
+        finished = true;
+        setIsLocatingGPS(false);
+        setLocationStatus(
+          language === 'ar'
+            ? 'خدمة الموقع (GPS) مغلقة بالهاتف. تم اعتماد المدينة المختارة دون تعليق.'
+            : 'Konum servisi kapalı. Seçili şehir kullanılıyor.'
+        );
+        setTimeout(() => setLocationStatus(null), 4000);
+      }
+    }, 5000);
+
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(safetyTimer);
+
         const { latitude, longitude, accuracy } = pos.coords;
         let districtName = '';
         let cityName = language === 'ar' ? 'موقعي الحالي' : 'Mevcut Konumum';
@@ -174,7 +193,7 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
         };
 
         setSelectedCity(gpsCity);
-        localStorage.setItem('almuslim_saved_city', JSON.stringify(gpsCity));
+        safeStorage.setItem('almuslim_saved_city', JSON.stringify(gpsCity));
         setIsLocatingGPS(false);
 
         const accuracyLabel = `(±${Math.round(accuracy || 10)} ${t.meters})`;
@@ -183,12 +202,18 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
         setTimeout(() => setLocationStatus(null), 4500);
       },
       (err) => {
-        console.warn('Geolocation error:', err);
+        if (finished) return;
+        finished = true;
+        clearTimeout(safetyTimer);
         setIsLocatingGPS(false);
-        setLocationStatus(t.locationError);
+        setLocationStatus(
+          language === 'ar'
+            ? 'خدمة الموقع (GPS) مغلقة بالهاتف. تم استخدام المدينة المحددة بنجاح.'
+            : 'GPS kapalı. Seçilen şehrin vakitleri kullanılıyor.'
+        );
         setTimeout(() => setLocationStatus(null), 3500);
       },
-      { timeout: 15000, enableHighAccuracy: true, maximumAge: 0 }
+      { timeout: 5000, enableHighAccuracy: false, maximumAge: 60000 }
     );
   };
 
@@ -462,7 +487,7 @@ export const PrayerScreen: React.FC<PrayerScreenProps> = ({
                   key={idx}
                   onClick={() => {
                     setSelectedCity(city);
-                    localStorage.setItem('almuslim_saved_city', JSON.stringify(city));
+                    safeStorage.setItem('almuslim_saved_city', JSON.stringify(city));
                     setIsCityModalOpen(false);
                   }}
                   className={`w-full text-start p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${

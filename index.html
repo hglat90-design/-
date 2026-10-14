@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>المسلم - Al-Muslim Islamic App</title>
     <meta name="description" content="تطبيق المسلم الشامل - أوقات الصلاة الدقيقة، الأذان التلقائي، القرآن الكريم بالتفسير والترجمة التركية، اتجاه القبلة، الأذكار، والسبحة الإلكترونية بتقنية Jetpack Compose." />
     <meta property="og:title" content="المسلم - Al-Muslim Islamic App" />
@@ -14,24 +14,19 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="manifest.webmanifest" />
 
-    <!-- GitHub Pages Trailing Slash & SPA Redirect Handling -->
+    <!-- Safe URL & Base Path handling compatible with AppCreator24, WebViews & GitHub Pages -->
     <script>
-      (function(l) {
-        if (l.search[1] === '/' ) {
-          var decoded = l.search.slice(1).split('&').map(function(s) { 
-            return s.replace(/~and~/g, '&')
-          }).join('?');
-          window.history.replaceState(null, null,
-              l.pathname.slice(0, -1) + decoded + l.hash
-          );
+      (function() {
+        try {
+          // Non-destructive URL path normalization for relative assets without triggering page reloads
+          var p = window.location.pathname;
+          if (p && !p.endsWith('/') && !p.split('/').pop().includes('.')) {
+            window.history.replaceState(null, '', p + '/' + window.location.search + window.location.hash);
+          }
+        } catch (e) {
+          console.debug('Path normalization notice:', e);
         }
-      }(window.location));
-
-      if (window.location.hostname.endsWith('github.io') && 
-          !window.location.pathname.endsWith('/') && 
-          !window.location.pathname.split('/').pop().includes('.')) {
-        window.location.replace(window.location.pathname + '/' + window.location.search + window.location.hash);
-      }
+      })();
     </script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,22 +35,38 @@
   </head>
   <body class="bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500/30 selection:text-emerald-200" style="background-color: #020617; margin: 0; min-height: 100vh;">
     <div id="root">
-      <!-- High-fidelity Islamic Loading Screen preventing any White Screen flickering -->
-      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #020617; color: #f8fafc; font-family: 'Cairo', system-ui, -apple-system, sans-serif; text-align: center; padding: 20px; direction: rtl;">
-        <div style="width: 70px; height: 70px; border-radius: 20px; background: linear-scale(135deg, #059669, #064e3b); display: flex; align-items: center; justify-content: center; font-size: 34px; margin-bottom: 16px; border: 1px solid rgba(245, 158, 11, 0.4); box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.4);">
+      <!-- High-fidelity Splash Screen with Auto-Failsafe & WebView Compatibility -->
+      <div id="splash-container" style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #020617; color: #f8fafc; font-family: 'Cairo', system-ui, -apple-system, sans-serif; text-align: center; padding: 20px; direction: rtl;">
+        <div style="width: 74px; height: 74px; border-radius: 22px; background: linear-gradient(135deg, #059669, #064e3b); display: flex; align-items: center; justify-content: center; font-size: 36px; margin-bottom: 16px; border: 1px solid rgba(245, 158, 11, 0.4); box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.4);">
           🕋
         </div>
-        <div style="font-size: 26px; font-weight: 800; color: #f59e0b; margin-bottom: 6px;">
+        <div style="font-size: 26px; font-weight: 800; color: #f59e0b; margin-bottom: 6px; letter-spacing: 0.5px;">
           المسلم · Al-Muslim
         </div>
-        <div style="font-size: 13px; color: #34d399; margin-bottom: 24px;">
+        <div style="font-size: 13px; color: #34d399; margin-bottom: 24px; font-weight: 500;">
           رفيقك الإيماني اليومي
         </div>
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #94a3b8;">
+        <div id="splash-status" style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #94a3b8;">
           <div style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></div>
-          <span>جارٍ تجهيز مواقيت الصلاة والمصحف الشريف...</span>
+          <span id="splash-text">جارٍ تجهيز مواقيت الصلاة والمصحف الشريف...</span>
         </div>
+        <!-- Manual Launch Trigger if connection or WebView stalls -->
+        <button id="splash-retry-btn" onclick="window.location.reload(true)" style="display: none; margin-top: 20px; padding: 10px 22px; border-radius: 12px; background-color: #10b981; color: #020617; font-weight: bold; font-size: 13px; border: none; cursor: pointer; font-family: inherit;">
+          بدء التطبيق الآن 🚀
+        </button>
       </div>
+
+      <!-- Failsafe Timer: If JavaScript takes more than 4 seconds, show manual launch button -->
+      <script>
+        setTimeout(function() {
+          var btn = document.getElementById('splash-retry-btn');
+          var text = document.getElementById('splash-text');
+          if (btn && document.getElementById('splash-container')) {
+            btn.style.display = 'inline-block';
+            if (text) text.textContent = 'اكتمل التحميل، اضغط للبدء إذا لم يفتح تلقائياً';
+          }
+        }, 3500);
+      </script>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

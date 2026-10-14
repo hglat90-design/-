@@ -28,6 +28,7 @@ import {
   sendDeviceNotification,
 } from '../utils/notificationManager';
 import { playAdhan, stopAdhan, playCompletionChime, triggerHaptic } from '../utils/soundEffects';
+import { safeStorage } from '../utils/safeStorage';
 
 interface RemindersSectionProps {
   language: Language;
@@ -66,7 +67,7 @@ export const RemindersSection: React.FC<RemindersSectionProps> = ({
   // Default Custom Islamic Reminders
   const [customReminders, setCustomReminders] = useState<CustomReminderItem[]>(() => {
     if (propReminders && propReminders.length > 0) return propReminders;
-    const saved = localStorage.getItem('almuslim_custom_reminders');
+    const saved = safeStorage.getItem('almuslim_custom_reminders');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -116,7 +117,7 @@ export const RemindersSection: React.FC<RemindersSectionProps> = ({
 
   // Persist custom reminders
   useEffect(() => {
-    localStorage.setItem('almuslim_custom_reminders', JSON.stringify(customReminders));
+    safeStorage.setItem('almuslim_custom_reminders', JSON.stringify(customReminders));
     if (onUpdateCustomReminders) {
       onUpdateCustomReminders(customReminders);
     }
